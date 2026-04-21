@@ -80,14 +80,26 @@ def refresh(refresh_token: str = Body(..., embed=True), db: Session = Depends(ge
     new_access_token, _, _ = auth.create_tokens(str(db_token.user_id))
     
     return {"access_token": new_access_token, "token_type": "bearer"}
+# [내 정보 불러오기]
+@router.get("/user/me")
+def get_me(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user
 
-# [유저 정보 수정]
+# [내 정보 수정]
 @router.patch("/user/me")
-def update_me(update_data: dict, db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+def update_me(
+    update_data: dict = Body(...), 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
     if "nickname" in update_data:
         current_user.nickname = update_data["nickname"]
-    if "account_pwd" in update_data:
-        current_user.account_pwd = auth.hash_password(update_data["account_pwd"])
+        
+    if "new_password" in update_data and "old_password" in update_data:
+        if not auth.verify_password(update_data["old_password"], current_user.account_pwd):
+            raise HTTPException(status_code=400, detail="기존 비밀번호가 일치하지 않습니다.")
+        current_user.account_pwd = auth.hash_password(update_data["new_password"])
+        
     if "memo" in update_data:
         current_user.memo = update_data["memo"]
     
